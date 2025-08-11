@@ -1,0 +1,141 @@
+import os
+import re
+from flask import Flask, request, render_template_string
+import pdfplumber
+import spacy
+from sqlalchemy import create_engine, Column, Integer, String, Text
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+# Initialize spaCy
+nlp = spacy.load("en_core_web_sm")
+
+# Basic skills list
+SKILLS_DB = ['Python', 'Java', 'C++', 'SQL', 'JavaScript', 'Flask', 'Django', 'React', 'AWS', 'Docker', 'Kubernetes']
+
+# Flask app setup
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'uploads'
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# SQLite database for simplicity
+DATABASE_URL = "sqlite:///resumes.db"
+engine = create_engine(DATABASE_URL, echo=False)
+Session = sessionmaker(bind=engine)
+session = Session()
+Base = declarative_base()
+
+# Database model
+class Candidate(Base):
+    __tablename__ = "candidates"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100))
+    skills = Column(Text)
+    education = Column(Text)
+
+Base.metadata.create_all(engine)
+
+# Parsing functions
+def extract_text_from_pdf(file_path):
+    text = ""
+    with pdfplumber.open(file_path) as pdf:
+        for page in pdf.pages:
+            text += page.extract_text() + "\n"
+    return text
+
+def extract_name(text):
+    doc = nlp(text)
+    for ent in doc.ents:
+        if ent.label_ == "PERSON":
+            return ent.text
+    return "Unknown"
+
+def extract_education(text):
+    education_keywords = ['Bachelor', 'Master', 'B.Sc', 'M.Sc', 'Bachelors', 'Masters', 'University', 'College', 'Diploma']
+    lines = text.split('\n')
+    education_lines = []
+    for line in lines:
+        for word in education_keywords:
+            if word.lower() in line.lower():
+                education_lines.append(line.strip())
+    return education_lines
+
+def extract_skills(text):
+    skills_found = []
+    for skill in SKILLS_DB:
+        pattern = re.compile(r'\b' + re.escape(skill) + r'\b', re.IGNORECASE)
+        if re.search(pattern, text):
+            skills_found.append(skill)
+    return skills_found
+
+# HTML templates (in one file using render_template_string)
+INDEX_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Resume Parser Upload</title>
+</head>
+<body>
+    <h1>Upload your Resume (PDF only)</h1>
+    <form method="post" enctype="multipart/form-data">
+        <input type="file" name="resume" accept=".pdf" required>
+        <button type="submit">Parse Resume</button>
+    </form>
+</body>
+</html>
+"""
+
+RESULT_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Parsed Resume Result</title>
+</head>
+<body>
+    <h1>Extracted Resume Details</h1>
+    <p><strong>Name:</strong> {{ name }}</p>
+    <p><strong>Skills:</strong> {{ skills|join(', ') if skills else "None found" }}</p>
+    <p><strong>Education:</strong></p>
+    {% if education %}
+    <ul>
+    {% for edu in education %}
+        <li>{{ edu }}</li>
+    {% endfor %}
+    </ul>
+    {% else %}
+    <p>None found</p>
+    {% endif %}
+    <a href="/">Upload Another Resume</a>
+</body>
+</html>
+"""
+
+# Flask routes
+@app.route("/", methods=["GET", "POST"])
+def upload_resume():
+    if request.method == "POST":
+        file = request.files.get('resume')
+        if file and file.filename.endswith(".pdf"):
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+            file.save(file_path)
+
+            text = extract_text_from_pdf(file_path)
+            name = extract_name(text)
+            education = extract_education(text)
+            skills = extract_skills(text)
+
+            # Save to DB
+            candidate = Candidate(
+                name=name,
+                skills=", ".join(skills),
+                education="\n".join(education)
+            )
+            session.add(candidate)
+            session.commit()
+
+            return render_template_string(RESULT_HTML, name=name, skills=skills, education=education)
+        else:
+            return "Please upload a valid PDF file.", 400
+    return render_template_string(INDEX_HTML)
+
+if __name__ == "__main__":
+    app.run(debug=True)
