@@ -1,1 +1,19 @@
-# Automated-Resume-Parser
+# Automated-Resume-Parser: Project Description
+
+The Automated Resume Parser is a web-based application developed using Python’s Flask framework, designed to simplify and expedite the process of extracting essential information from resumes submitted in PDF format. This system automatically identifies and categorizes key candidate details such as their name, skills, and educational background, and stores this information in a local database for easy retrieval and management.
+
+The core functionality of the application revolves around processing PDF resumes uploaded by users through a straightforward web interface. Once a resume is uploaded, the system extracts the raw textual content from the PDF using the pdfplumber library, which is capable of accurately retrieving text data from multi-page documents. This text serves as the input for further natural language processing and keyword extraction operations.
+
+To identify the candidate’s name, the application employs the spaCy library, a powerful open-source natural language processing tool. Specifically, it leverages spaCy’s pre-trained English language model, en_core_web_sm, to perform Named Entity Recognition (NER). This process scans the resume text and extracts entities labeled as "PERSON," which typically correspond to names. The first detected person entity is assumed to be the candidate’s name.
+
+For skill extraction, the system uses a predefined database of commonly sought-after technical skills such as Python, Java, SQL, Flask, Docker, AWS, and more. It scans the resume text using regular expressions to identify and collect any matches from this skills list. This approach allows the parser to quickly highlight the candidate’s technical proficiencies mentioned anywhere in the document.
+
+Similarly, educational qualifications are identified by searching the text for keywords related to academic degrees and institutions. Terms like Bachelor, Master, B.Sc, M.Sc, University, and Diploma are used as markers to extract relevant educational lines from the resume. These lines are collected and displayed to summarize the candidate’s academic background.
+
+Once the extraction process is complete, the collected data—name, skills, and education—is stored in a local SQLite database using SQLAlchemy ORM. This database-backed approach provides persistent storage, allowing the system to maintain records of multiple candidates for easy future access, filtering, or reporting.
+
+The web interface is minimalistic and user-friendly, implemented with Flask’s route handling and template rendering features. The home page contains a file upload form that accepts PDF files. Upon submission, the uploaded resume is processed, and the parsed information is displayed neatly on a result page. Users can easily upload additional resumes without restarting the application.
+
+The project benefits from several advantages: it significantly reduces the manual effort required for resume screening by automating the extraction of critical data points, supports quick searching and filtering of candidate information due to the database backend, and is built entirely on open-source Python libraries that are easy to install and extend. The use of SQLite ensures lightweight deployment without the complexity of managing a full-scale database server.
+
+In summary, this Automated Resume Parser demonstrates a practical application of web development, natural language processing, and database management to address a common human resources challenge. By automating candidate data extraction from resumes, it streamlines recruitment workflows, improves data accuracy, and enhances overall hiring efficiency. The modular design also allows easy customization, such as adding more skills, refining education extraction, or integrating additional file formats, making it a valuable tool for organizations looking to modernize their hiring process.
